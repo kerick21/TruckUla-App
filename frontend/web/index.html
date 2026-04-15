@@ -1,13 +1,72 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Waze Clone - Navegación en Tiempo Real</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TruckUla - Navegación para Camiones</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/remixicon/3.5.0/remixicon.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app">
+        <header class="header">
+            <h1>🚛 TruckUla</h1>
+            <p>Navegación para Camiones</p>
+        </header>
+
+        <div class="main-content">
+            <aside class="sidebar">
+                <div class="search-box">
+                    <label>Origen</label>
+                    <input type="text" id="origin-input" placeholder="Tu ubicación...">
+                </div>
+
+                <div class="search-box">
+                    <label>Destino</label>
+                    <input type="text" id="destination-input" placeholder="Destino...">
+                </div>
+
+                <button id="current-location-btn" class="btn btn-green">
+                    <i class="ri-map-pin-line"></i> Mi Ubicación
+                </button>
+
+                <button id="search-btn" class="btn btn-blue">
+                    <i class="ri-search-line"></i> Buscar Ruta
+                </button>
+
+                <div class="height-selector">
+                    <label>Altura del Camión</label>
+                    <div class="height-grid">
+                        <button class="height-btn" data-height="11">11'</button>
+                        <button class="height-btn" data-height="12.6">12.6'</button>
+                        <button class="height-btn" data-height="13">13'</button>
+                        <button class="height-btn" data-height="13.6">13.6'</button>
+                    </div>
+                    <p id="height-info">Altura: 12.6'</p>
+                </div>
+
+                <button id="report-btn" class="btn btn-orange">
+                    <i class="ri-alert-line"></i> Reportar
+                </button>
+            </aside>
+
+            <div id="map" class="map"></div>
+        </div>
+
+        <footer class="footer">
+            <div class="reports">
+                <h3>Reportes Cercanos</h3>
+                <div id="reports-list"></div>
+            </div>
+            <div class="alerts">
+                <h3>Alertas</h3>
+                <div id="alerts-list"></div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="app.js"></script>
+</body>
 </html>
