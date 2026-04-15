@@ -1,0 +1,170 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: waze
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: waze-config
+  namespace: waze
+data:
+  NODE_ENV: "production"
+  CORS_ORIGIN: "https://waze.example.com"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: waze-backend
+  namespace: waze
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: waze-backend
+  template:
+    metadata:
+      labels:
+        app: waze-backend
+    spec:
+      containers:
+      - name: backend
+        image: waze-backend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NODE_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: waze-config
+              key: NODE_ENV
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: waze-secrets
+              key: database-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: waze-secrets
+              key: redis-url
+        - name: MONGODB_URL
+          valueFrom:
+            secretKeyRef:
+              name: waze-secrets
+              key: mongodb-url
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: waze-frontend
+  namespace: waze
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: waze-frontend
+  template:
+    metadata:
+      labels:
+        app: waze-frontend
+    spec:
+      containers:
+      - name: frontend
+        image: waze-frontend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: waze-backend
+  namespace: waze
+spec:
+  selector:
+    app: waze-backend
+  ports:
+  - protocol: TCP
+    port: 3000
+    targetPort: 3000
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: waze-frontend
+  namespace: waze
+spec:
+  selector:
+    app: waze-frontend
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+  type: LoadBalancer
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: waze-backend-hpa
+  namespace: waze
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: waze-backend
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80

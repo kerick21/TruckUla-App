@@ -1,0 +1,170 @@
+version: '3.8'
+
+services:
+  # PostgreSQL + PostGIS
+  postgres:
+    image: postgis/postgis:15-3.3
+    container_name: waze_postgres
+    environment:
+      POSTGRES_USER: waze_user
+      POSTGRES_PASSWORD: waze_password
+      POSTGRES_DB: waze_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - waze_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U waze_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: waze_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - waze_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MongoDB
+  mongodb:
+    image: mongo:6.0
+    container_name: waze_mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: waze_user
+      MONGO_INITDB_ROOT_PASSWORD: waze_password
+      MONGO_INITDB_DATABASE: waze_db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - waze_network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ClickHouse (Analytics)
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: waze_clickhouse
+    environment:
+      CLICKHOUSE_DB: waze_analytics
+      CLICKHOUSE_USER: waze_user
+      CLICKHOUSE_PASSWORD: waze_password
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    networks:
+      - waze_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Kafka
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: waze_kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+    networks:
+      - waze_network
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions.sh", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Zookeeper (para Kafka)
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: waze_zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - waze_network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: waze_backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://waze_user:waze_password@postgres:5432/waze_db
+      REDIS_URL: redis://redis:6379
+      MONGODB_URL: mongodb://waze_user:waze_password@mongodb:27017/waze_db
+      KAFKA_BROKERS: kafka:29092
+      CLICKHOUSE_URL: http://clickhouse:8123
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - waze_network
+    command: npm run dev
+
+  # Frontend Web
+  frontend:
+    build:
+      context: ./frontend/web
+      dockerfile: Dockerfile
+    container_name: waze_frontend
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./frontend/web:/app
+      - /app/node_modules
+    networks:
+      - waze_network
+    command: npm run dev
+
+volumes:
+  postgres_data:
+  redis_data:
+  mongodb_data:
+  clickhouse_data:
+
+networks:
+  waze_network:
+    driver: bridge
