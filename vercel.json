@@ -2,30 +2,12 @@
   "buildCommand": "echo 'No build needed'",
   "outputDirectory": "frontend/web",
   "public": true,
+  "cleanUrls": false,
+  "trailingSlash": false,
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/(?!app\\.js|styles\\.css|.*\\.png|.*\\.jpg|.*\\.ico|.*\\.json)(.*)",
       "destination": "/index.html"
-    }
-  ],
-  "headers": [
-    {
-      "source": "/app.js",
-      "headers": [
-        {
-          "key": "Content-Type",
-          "value": "application/javascript"
-        }
-      ]
-    },
-    {
-      "source": "/styles.css",
-      "headers": [
-        {
-          "key": "Content-Type",
-          "value": "text/css"
-        }
-      ]
     }
   ]
 }
